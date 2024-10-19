@@ -76,4 +76,11 @@ output_file = "assets/brains_info_uploaded.json"
 with open(output_file, "w") as f:
     json.dump(nft_data_with_blob, f, indent=4)
 
+blob_id, endEpoch = upload_file_to_walrus(output_file)
+
+data = {"blob_id": blob_id, "endEpoch": endEpoch}
+
+with open("assets/info_blob_id.json", "w") as f:
+    json.dump(data, f)
+
 print(f"New JSON file with blobIds saved to {output_file}")
