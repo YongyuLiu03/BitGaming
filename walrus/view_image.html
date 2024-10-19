@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Blob Image</title>
+</head>
+<body>
+    <h1>Blob Image Viewer</h1>
+    <img id="image" alt="Image from Blob" style="max-width: 500px;">
+
+    <script>
+        // URL to download the blob image (example)
+        const blobUrl = 'https://aggregator.walrus-testnet.walrus.space/v1/AB5FyW7L6-Wvn4uEWYglHSCo2mfGTcBX0q-g-LyhUdg';
+
+        // Fetch the blob and display it in the image tag
+        fetch(blobUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                // Create a local URL for the blob image
+                const blobImageUrl = URL.createObjectURL(blob);
+
+                // Set the src of the image element
+                document.getElementById('image').src = blobImageUrl;
+            })
+            .catch(err => console.error('Error fetching blob:', err));
+    </script>
+</body>
+</html>
