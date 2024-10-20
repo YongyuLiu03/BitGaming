@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 3000;
 
 const fs = require("fs").promises;
 const axios = require("axios");
+const json = require("body-parser/lib/types/json");
 
 // Store game settings for active sessions
 let gameSettings = {};
@@ -85,6 +86,15 @@ app.post("/continue", async (req, res) => {
   updateJsonFile(walrus_data);
 
 });
+
+app.get("/gallery", async (req, res) => {
+  const walrus_json = "saved_files/walrus_blob_id.json"
+  const fileContent = await fs.readFile(walrus_json, 'utf8');
+  jsonData = JSON.parse(fileContent);
+  console.log(jsonData);
+  res.json(jsonData);
+
+})
 
 function generateUniqueFilename() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
