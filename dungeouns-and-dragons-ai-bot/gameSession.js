@@ -60,12 +60,12 @@ const startGameSession = async (
             After the end of the game (due to the death of all players or due to the fact that all turns have ended), invite the player(s) to start again (to do this, they needs to enter and send "/create")`,
       tools: [{ type: "code_interpreter" }],
       model:
-        gameSettings.gptVersion === "GPT-4" ? "gpt-4-turbo" : "gpt-o1-mini",
+        gameSettings.gptVersion === "GPT-4" ? "gpt-4-turbo" : "gpt-4o-mini",
     });
     thread = await openai.beta.threads.create();
     await openai.beta.threads.messages.create(thread.id, {
       role: "assistant",
-      content: "Round 1. Generate the initial story for the game.",
+      content: "Generating story for the game.",
     });
 
     const response = await handleOpenAiRequest(thread.id, assistant.id);

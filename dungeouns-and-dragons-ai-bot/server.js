@@ -13,6 +13,9 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const fs = require("fs");
+const axios = require("axios");
+
 // Store game settings for active sessions
 let gameSettings = {};
 
@@ -65,7 +68,36 @@ app.post("/continue", async (req, res) => {
   const imageResponse = await generateImageResponse(response);
 
   res.json({ message: response, choices, imageUrl: imageResponse.data[0].url });
+  saveTextToFile(response);
+  saveImageLocally(imageResponse.data[0].url);
+
+
 });
+
+
+
+function generateUniqueFilename() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `dnd_${timestamp}.png`;
+}
+
+async function saveImageLocally(imageUrl) {
+  try {
+    const filename = generateUniqueFilename(); // Generate unique filename
+    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    fs.writeFileSync(`./saved_files/${filename}`, response.data);
+    console.log(`Image saved locally as ${filename}`);
+  } catch (error) {
+    console.error("Error saving image:", error);
+  }
+}
+
+async function saveTextToFile(text) {
+  const filename = generateUniqueFilename();
+  const filePath = path.join(__dirname, "saved_files", `${filename}.txt`);
+  fs.writeFileSync(filePath, text, "utf8");
+  console.log(`Text saved: ${filePath}`);
+}
 
 // Start the Express server
 app.listen(PORT, () => {

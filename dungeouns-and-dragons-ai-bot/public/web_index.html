@@ -3,36 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DnD Game</title>
+  <title>DnD Game Setup</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; }
-    .chat-container { max-width: 600px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-    .message { margin: 10px 0; }
-    .choices { margin-top: 10px; }
+    .container { max-width: 600px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+    .field { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    select, input { width: 100%; padding: 8px; }
+    .chat-container { margin-top: 20px; }
   </style>
 </head>
 <body>
+
+  <div class="container">
+    <div class="field">
+      <label for="gpt-version">Select GPT Version:</label>
+      <select id="gpt-version">
+        <option value="gpt-4o-mini">GPT-4 (Mini)</option>
+        <option value="gpt-4-turbo">GPT-4 (Turbo)</option>
+        <option value="gpt-3.5-turbo">GPT-3.5 (Turbo)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="genre">Select Genre:</label>
+      <select id="genre">
+        <option value="Fantasy">Fantasy</option>
+        <option value="Adventure">Adventure</option>
+        <option value="Post-apocalypse">Post-apocalypse</option>
+        <option value="Magic">Magic</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="turns">Number of Turns:</label>
+      <input type="number" id="turns" min="1" max="20" value="5" />
+    </div>
+
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
   <div class="chat-container">
     <div id="chat-log"></div>
     <input type="text" id="user-input" placeholder="Enter your choice..." />
-    <button id="send-button">Send</button>
+    <button id="send-button" onclick="sendUserInput()">Send</button>
   </div>
 
   <script>
-    // Initialize game on page load
-    window.onload = startGame;
-
-    // Start a new game session
+    // Start the game with user-selected options
     async function startGame() {
+      const gptVersion = document.getElementById('gpt-version').value;
+      const genre = document.getElementById('genre').value;
+      const turns = parseInt(document.getElementById('turns').value);
+
       try {
         const response = await fetch('/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            gptVersion: "gpt-4o-mini",
-            language: "English",
-            genre: "Fantasy",
-            turns: 5
+            gptVersion,
+            language: "English",  // You can add language selection too
+            genre,
+            turns
           })
         });
 
