@@ -2,92 +2,115 @@ require("dotenv").config();
 const OpenAI = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPEN_AI_API_KEY });
 
-let assistant = null;
-let thread = null;
+// const userSessionDictionary = new Map<string, { assistantId: string; sessions: Record<string, string> }>();
+const userSessionDictionary = new Map();
 
-const handleOpenAiRequest = async (threadId, assistantId) => {
-  let run = await openai.beta.threads.runs.createAndPoll(threadId, {
-    assistant_id: assistantId,
-  });
-
-  let result = "";
-
-  if (run.status === "completed") {
-    const messages = await openai.beta.threads.messages.list(run.thread_id);
-
-    for (const dataItem of messages.data) {
-      result = dataItem.content?.[0]?.text?.value ?? "";
-      console.log(result);
-      console.log("_____________");
-    }
-
-    result = messages.data[0].content?.[0]?.text?.value ?? "";
-  } else {
-    result = "The game session has been interrupted. Please try again.";
-  }
-
-  return result;
-};
+function generate_instruction(gameSettings) {
+  const instructions = `You are the author of an interactive quest in a ${gameSettings.genre} setting. 
+    Come up with an interesting story. Your message is a part of the story that forces the player(s) to make a choice.
+    The game should consist of a short part (up to ${gameSettings.max_chars} characters) of your story and the options for player actions you propose.
+    At the end of each of your messages, ask a question about how the player should act in the current situation. 
+    Offer at minimum three options to choose from, but leave the opportunity to offer actions by player.
+    The quest must be completed within ${gameSettings.turns} player(s) turns.
+    The game can be played by only one player. 
+    Create a story. Players will respond with the structure {"user": "Response"}.
+    With each turn the situation should become more intense and logically related to the previous turn.
+    The player may encounter various dangers on theirs journey. 
+    If the player chooses a bad answer, player may die and then the game will end.
+    Use a speaking style that suits the chosen setting.
+    Each time you would be notified with the current turn/round number.
+        Make sure to finish the story within ${gameSettings.turns} rounds.
+        Don't ask the user anything after the game finishes. Just congratulate.
+    Communicate with players in (${gameSettings.language} language). Each response should be in the same language - ${gameSettings.language}.
+    After the end of the game (due to the death of all players or due to the fact that all turns have ended), invite the player(s) to start again (to do this, they needs to enter and send "/create")`
+  return instructions;
+}
 
 const startGameSession = async (
+  wallet_address,
+  session_id,
   gameSettings,
-  userPrompt,
-  isFirstTurn = false
 ) => {
-  // for multiple users add (The game will be played by {2} players, ask them questions in turns. --- optional)
+    if (!userSessionDictionary.has(wallet_address)) {
+      const assistant = await openai.beta.assistants.create({
+        name: 'Roleplaying game master',
+        instructions: generate_instruction(gameSettings),
+        model: 'gpt-4o',
+      });
 
-  //change later to use id of already created assistant
-  if (isFirstTurn) {
-    assistant = await openai.beta.assistants.create({
-      name: "Roleplaying game master",
-      instructions: `You are the author of an interactive quest in a ${gameSettings.genre} setting. 
-            Come up with an interesting story. Your message is a part of the story that forces the player(s) to make a choice.
-            The game should consist of a short part (up to ${gameSettings.max_chars} characters) of your story and the options for player actions you propose.
-            At the end of each of your messages, ask a question about how the player should act in the current situation. 
-            Offer at minimum three options to choose from, but leave the opportunity to offer actions by player.
-            The quest must be completed within ${gameSettings.turns} player(s) turns.
-            The game can be played by one or several players. 
-            If there is more than one player, players must take turns - if someone breaks the line, report it and ask the correct player to respond.
-            Create a story depending on the number of players playing. Players will respond with the structure {"Player Name": "Response"}.
-            With each turn the situation should become more intense and logically related to the previous turn.
-            The player(s) may encounter various dangers on theirs journey. 
-            If the player chooses a bad answer, player may die and then the game will end.
-            Use a speaking style that suits the chosen setting.
-            Each time you would be notified with the current turn/round number.
-                Make sure to finish the story within ${gameSettings.turns} rounds.
-                Don't ask the user anything after the game finishes. Just congratulate.
-            Communicate with players in (${gameSettings.language} language). Each response should be in the same language - ${gameSettings.language}.
-            After the end of the game (due to the death of all players or due to the fact that all turns have ended), invite the player(s) to start again (to do this, they needs to enter and send "/create")`,
-      tools: [{ type: "code_interpreter" }],
-      model:
-        gameSettings.gptVersion === "GPT-4" ? "gpt-4-turbo" : "gpt-4o-mini",
-    });
-    thread = await openai.beta.threads.create();
-    await openai.beta.threads.messages.create(thread.id, {
-      role: "assistant",
-      content: "Generating story for the game.",
-    });
-
-    const response = await handleOpenAiRequest(thread.id, assistant.id);
-    return response;
-  } else {
-    if (!thread || !assistant) {
-      return "rofl";
+      // for each separate sessions, separate threads are created
+      userSessionDictionary.set(wallet_address, { assistantId: assistant.id, sessions: {} });
     }
-    await openai.beta.threads.messages.create(thread.id, {
-      role: "assistant",
-      content: `Round ${gameSettings.round}`,
-    });
+    
+    const assistantId = userSessionDictionary.get(wallet_address)?.assistantId;
+    const thread = await openai.beta.threads.create();
 
-    await openai.beta.threads.messages.create(thread.id, {
-      role: "user",
+    // @ts-ignore
+    userSessionDictionary.get(wallet_address).sessions[session_id] = thread.id;
+    
+    try {
+      const run = await openai.beta.threads.runs.create(thread.id, { assistant_id: assistantId });
+      
+      const ai_message = await new Promise(resolve => {
+        const timerLoopId = setInterval(async () => {
+          const run_data = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+          if (run_data.status === 'completed') {
+            clearInterval(timerLoopId);
+            const messages = await openai.beta.threads.messages.list(thread.id);
+            const ai_response = messages.data[0].content[0];
+            resolve(ai_response.text.value);
+          }
+          if (run_data.status === 'failed' || run_data.status === 'expired' || run_data.status === 'cancelled') {
+            clearInterval(timerLoopId);
+            resolve('Sorry, I am having trouble understanding you. Could you please rephrase your question?');
+          }
+        }, 2000);
+      });
+
+      return ai_message;
+    } catch (error) {
+      console.error('Error fetching data from OpenAI:', error);
+    }
+};
+
+const sendQuery = async (
+  wallet_address,
+  session_id,
+  userPrompt) => {
+    const assistantId = userSessionDictionary.get(wallet_address)?.assistantId;
+    const threadId = userSessionDictionary.get(wallet_address)?.sessions[session_id];
+    console.log(userSessionDictionary, threadId)
+    
+
+    await openai.beta.threads.messages.create(threadId, {
+      role: 'user',
       content: userPrompt,
     });
+    
+    try {
+      const run = await openai.beta.threads.runs.create(threadId, { assistant_id: assistantId });
+      
+      const ai_message = await new Promise(resolve => {
+        const timerLoopId = setInterval(async () => {
+          const run_data = await openai.beta.threads.runs.retrieve(threadId, run.id);
+          if (run_data.status === 'completed') {
+            clearInterval(timerLoopId);
+            const messages = await openai.beta.threads.messages.list(threadId);
+            const ai_response = messages.data[0].content[0];
+            resolve(ai_response.text.value);
+          }
+          if (run_data.status === 'failed' || run_data.status === 'expired' || run_data.status === 'cancelled') {
+            clearInterval(timerLoopId);
+            resolve('Sorry, I am having trouble understanding you. Could you please rephrase your question?');
+          }
+        }, 2000);
+      });
 
-    const response = await handleOpenAiRequest(thread.id, assistant.id);
-    return response;
-  }
-};
+      return ai_message;
+    } catch (error) {
+      console.error('Error fetching data from OpenAI:', error);
+    }
+}
 
 async function generateImageResponse(prompt) {
   const openai = new OpenAI({ apiKey: process.env.OPEN_AI_API_KEY });
@@ -103,4 +126,5 @@ async function generateImageResponse(prompt) {
 module.exports = {
   startGameSession,
   generateImageResponse,
+  sendQuery
 };
