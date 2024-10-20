@@ -1,0 +1,6 @@
+custom genre = Universe of Ctulkchu
+custom number of characters = 250
+custom turns number = 10
+custom players number = 2
+names of the players = Ksenia, Kse
+custom language = Russian

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DnD Game</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; }
+    .chat-container { max-width: 600px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+    .message { margin: 10px 0; }
+    .choices { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div id="chat-log"></div>
+    <input type="text" id="user-input" placeholder="Enter your choice..." />
+    <button id="send-button">Send</button>
+  </div>
+
+  <script>
+    // Initialize game on page load
+    window.onload = startGame;
+
+    // Start a new game session
+    async function startGame() {
+      try {
+        const response = await fetch('/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gptVersion: "gpt-4o-mini",
+            language: "English",
+            genre: "Fantasy",
+            turns: 5
+          })
+        });
+
+        const data = await response.json();
+        displayMessage(data.message);
+        displayChoices(data.choices);
+      } catch (error) {
+        console.error("Error starting game:", error);
+      }
+    }
+
+    // Send user input to the server
+    async function sendUserInput() {
+      const userInput = document.getElementById('user-input').value;
+      if (!userInput) return; // Ensure input is not empty
+
+      displayMessage(`You: ${userInput}`); // Display user's input in chat
+      document.getElementById('user-input').value = ''; // Clear input field
+
+      try {
+        const response = await fetch('/continue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userPrompt: userInput })
+        });
+
+        const data = await response.json();
+        displayMessage(data.message);
+
+        if (data.imageUrl) {
+          displayImage(data.imageUrl);
+        }
+
+        displayChoices(data.choices);
+      } catch (error) {
+        console.error("Error sending user input:", error);
+      }
+    }
+
+    // Display messages in the chat log
+    function displayMessage(message) {
+      const chatLog = document.getElementById('chat-log');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message';
+      messageDiv.textContent = message;
+      chatLog.appendChild(messageDiv);
+      chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to bottom
+    }
+
+    // Display choices as buttons
+    function displayChoices(choices) {
+      const chatLog = document.getElementById('chat-log');
+      const choicesDiv = document.createElement('div');
+      choicesDiv.className = 'choices';
+
+      choices.forEach(choice => {
+        const button = document.createElement('button');
+        button.textContent = choice;
+        button.onclick = () => document.getElementById('user-input').value = choice;
+        choicesDiv.appendChild(button);
+      });
+
+      chatLog.appendChild(choicesDiv);
+      chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to bottom
+    }
+
+    // Display image in chat
+    function displayImage(imageUrl) {
+      const chatLog = document.getElementById('chat-log');
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.style.maxWidth = '100%';
+      chatLog.appendChild(img);
+      chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to bottom
+    }
+
+    // Add event listener to the Send button
+    document.getElementById('send-button').addEventListener('click', sendUserInput);
+  </script>
+</body>
+</html>
